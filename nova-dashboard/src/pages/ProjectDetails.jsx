@@ -4,6 +4,7 @@ import { motion } from "framer-motion";
 import { ArrowLeft, Calendar, Plus, Circle, Clock, CheckCircle2 } from "lucide-react";
 import { Avatar, ProgressBar, PriorityTag, StatusPill, ProgressRing } from "../components/ui";
 import { api } from "../lib/api";
+import AddTaskModal from "../components/AddTaskModal";
 
 const columns = [
   { key: "todo", label: "To-do", icon: Circle, color: "#7B7B8A" },
@@ -12,6 +13,7 @@ const columns = [
 ];
 
 function formatDate(iso) {
+  if (!iso) return "—";
   return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
@@ -20,16 +22,29 @@ export default function ProjectDetails() {
   const navigate = useNavigate();
   const [project, setProject] = useState(null);
   const [tasks, setTasks] = useState([]);
+  const [modalColumn, setModalColumn] = useState(null); // which column's "Add task" was clicked
+
+  function refresh() {
+    api.projects.get(id).then(setProject).catch(() => {});
+    api.projects.getTasks(id).then(setTasks).catch(() => {});
+  }
 
   useEffect(() => {
-    api.projects.get(id).then(setProject);
-    api.projects.getTasks(id).then(setTasks);
+    refresh();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
+  async function moveTask(taskId, newColumn) {
+    try {
+      await api.tasks.update(taskId, { column: newColumn });
+      refresh();
+    } catch {
+      // ignore — UI will just not update
+    }
+  }
+
   if (!project) {
-    return (
-      <div className="py-24 text-center text-ink-faint text-sm">Loading project…</div>
-    );
+    return <div className="py-24 text-center text-ink-faint text-sm">Loading project…</div>;
   }
 
   return (
@@ -42,7 +57,6 @@ export default function ProjectDetails() {
         Back to projects
       </button>
 
-      {/* Header */}
       <motion.div
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
@@ -53,7 +67,9 @@ export default function ProjectDetails() {
           <div>
             <p className="text-xs text-ink-faint mb-1.5">{project.client}</p>
             <h1 className="font-display text-2xl font-semibold">{project.name}</h1>
-            <p className="text-sm text-ink-faint mt-2 max-w-lg leading-relaxed">{project.description}</p>
+            {project.description && (
+              <p className="text-sm text-ink-faint mt-2 max-w-lg leading-relaxed">{project.description}</p>
+            )}
             <div className="flex flex-wrap items-center gap-2 mt-4">
               <StatusPill status={project.status} />
               <PriorityTag priority={project.priority} />
@@ -69,14 +85,11 @@ export default function ProjectDetails() {
             <div>
               <p className="text-xs text-ink-faint mb-2">Team</p>
               <div className="flex -space-x-2">
-                {project.members.map((m) => (
-                  <div key={m} className="ring-2 ring-base-300 rounded-full">
+                {project.members.map((m, i) => (
+                  <div key={`${m}-${i}`} className="ring-2 ring-base-300 rounded-full">
                     <Avatar initials={m} size={32} />
                   </div>
                 ))}
-                <button className="ring-2 ring-base-300 rounded-full h-8 w-8 grid place-items-center bg-white/[0.06] text-ink-faint hover:text-ink transition-colors">
-                  <Plus size={14} />
-                </button>
               </div>
             </div>
           </div>
@@ -93,7 +106,6 @@ export default function ProjectDetails() {
         </div>
       </motion.div>
 
-      {/* Kanban board */}
       <div className="grid md:grid-cols-3 gap-4">
         {columns.map((col, ci) => {
           const colTasks = tasks.filter((t) => t.column === col.key);
@@ -116,17 +128,32 @@ export default function ProjectDetails() {
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.3, delay: ci * 0.05 + ti * 0.04 }}
                     whileHover={{ y: -2 }}
-                    className="rounded-xl border border-white/[0.07] bg-base-200/70 p-3.5 cursor-pointer hover:border-white/[0.15] transition-colors"
+                    className="rounded-xl border border-white/[0.07] bg-base-200/70 p-3.5 hover:border-white/[0.15] transition-colors"
                   >
                     <p className="text-sm text-ink leading-snug">{t.title}</p>
                     <div className="flex items-center justify-between mt-3">
                       <PriorityTag priority={t.priority} />
-                      <Avatar initials={t.assignee} size={24} />
+                      {t.assignee && <Avatar initials={t.assignee} size={24} />}
                     </div>
-                    <p className="text-[11px] text-ink-faint mt-2 flex items-center gap-1">
-                      <Calendar size={11} />
-                      {formatDate(t.due)}
-                    </p>
+                    {t.due && (
+                      <p className="text-[11px] text-ink-faint mt-2 flex items-center gap-1">
+                        <Calendar size={11} />
+                        {formatDate(t.due)}
+                      </p>
+                    )}
+                    <div className="flex items-center gap-1.5 mt-3 pt-3 border-t border-white/[0.05]">
+                      {columns
+                        .filter((c) => c.key !== t.column)
+                        .map((c) => (
+                          <button
+                            key={c.key}
+                            onClick={() => moveTask(t.id, c.key)}
+                            className="text-[10px] rounded-md px-2 py-1 border border-white/[0.08] text-ink-faint hover:text-ink hover:border-white/20 transition-colors"
+                          >
+                            Move to {c.label}
+                          </button>
+                        ))}
+                    </div>
                   </motion.div>
                 ))}
                 {colTasks.length === 0 && (
@@ -134,7 +161,10 @@ export default function ProjectDetails() {
                     No tasks here yet
                   </div>
                 )}
-                <button className="w-full flex items-center justify-center gap-1.5 rounded-xl border border-dashed border-white/[0.1] py-2.5 text-xs text-ink-faint hover:text-ink hover:border-white/20 transition-colors">
+                <button
+                  onClick={() => setModalColumn(col.key)}
+                  className="w-full flex items-center justify-center gap-1.5 rounded-xl border border-dashed border-white/[0.1] py-2.5 text-xs text-ink-faint hover:text-ink hover:border-white/20 transition-colors"
+                >
                   <Plus size={13} />
                   Add task
                 </button>
@@ -143,6 +173,17 @@ export default function ProjectDetails() {
           );
         })}
       </div>
+
+      <AddTaskModal
+        open={modalColumn !== null}
+        column={modalColumn || "todo"}
+        projectId={id}
+        onClose={() => setModalColumn(null)}
+        onCreated={() => {
+          setModalColumn(null);
+          refresh();
+        }}
+      />
     </div>
   );
 }

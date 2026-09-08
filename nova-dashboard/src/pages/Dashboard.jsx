@@ -13,7 +13,6 @@ import StatCard from "../components/StatCard";
 import ProjectCard from "../components/ProjectCard";
 import { ProgressRing, Avatar } from "../components/ui";
 import { api } from "../lib/api";
-import { projects, activity } from "../data/mockData";
 
 function CustomTooltip({ active, payload, label }) {
   if (!active || !payload?.length) return null;
@@ -27,9 +26,13 @@ function CustomTooltip({ active, payload, label }) {
 
 export default function Dashboard() {
   const [summary, setSummary] = useState(null);
+  const [projects, setProjects] = useState([]);
+  const [activity, setActivity] = useState([]);
 
   useEffect(() => {
-    api.dashboard.getSummary().then(setSummary);
+    api.dashboard.getSummary().then(setSummary).catch(() => {});
+    api.projects.list().then(setProjects).catch(() => {});
+    api.activity.list().then(setActivity).catch(() => {});
   }, []);
 
   const s = summary?.stats;
@@ -38,7 +41,6 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6">
-      {/* Stat cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard label="Total Projects" value={s?.totalProjects ?? "—"} icon={FolderKanban} color="#6E56F8" index={0} />
         <StatCard label="Active Tasks" value={s?.activeTasks ?? "—"} icon={ListTodo} color="#FFB454" index={1} />
@@ -46,7 +48,6 @@ export default function Dashboard() {
         <StatCard label="Team Members" value={s?.teamMembers ?? "—"} icon={Users} color="#FF6B7A" index={3} />
       </div>
 
-      {/* Productivity + team snapshot */}
       <div className="grid lg:grid-cols-[1.6fr_1fr] gap-4">
         <motion.div
           initial={{ opacity: 0, y: 14 }}
@@ -62,7 +63,7 @@ export default function Dashboard() {
                 {s && (
                   <span className="flex items-center gap-1 text-xs text-jade-500 font-medium">
                     <TrendingUp size={13} />
-                    +{s.productivityDelta}% this week
+                    Across all tasks
                   </span>
                 )}
               </div>
@@ -78,12 +79,7 @@ export default function Dashboard() {
                   </linearGradient>
                 </defs>
                 <CartesianGrid stroke="rgba(255,255,255,0.05)" vertical={false} />
-                <XAxis
-                  dataKey="label"
-                  axisLine={false}
-                  tickLine={false}
-                  tick={{ fill: "#7B7B8A", fontSize: 12 }}
-                />
+                <XAxis dataKey="label" axisLine={false} tickLine={false} tick={{ fill: "#7B7B8A", fontSize: 12 }} />
                 <Tooltip content={<CustomTooltip />} cursor={{ stroke: "rgba(255,255,255,0.1)" }} />
                 <Area
                   type="monotone"
@@ -107,16 +103,18 @@ export default function Dashboard() {
         >
           <p className="text-sm text-ink-faint mb-4">Task distribution</p>
           <div className="flex items-center gap-5">
-            <ProgressRing value={s ? Math.round((s.completedTasks / (s.completedTasks + s.activeTasks)) * 100) : 0} size={92} stroke={9} color="#1FE0C2" />
+            <ProgressRing value={s ? Math.round((s.completedTasks / Math.max(s.completedTasks + s.activeTasks, 1)) * 100) : 0} size={92} stroke={9} color="#1FE0C2" />
             <div className="space-y-2.5 flex-1">
               <LegendRow color="#1FE0C2" label="Completed" value={s?.completedTasks} />
               <LegendRow color="#6E56F8" label="In progress" value={s?.activeTasks} />
-              <LegendRow color="#7B7B8A" label="Backlog" value={26} />
             </div>
           </div>
           <div className="mt-5 pt-5 border-t border-line">
             <p className="text-xs text-ink-faint mb-3">Recent activity</p>
             <div className="space-y-3">
+              {activity.length === 0 && (
+                <p className="text-xs text-ink-faint">No activity yet — create a project to get started.</p>
+              )}
               {activity.slice(0, 3).map((a) => (
                 <div key={a.id} className="flex items-start gap-2.5">
                   <Avatar initials={a.initials} color={a.color} size={26} />
@@ -132,7 +130,6 @@ export default function Dashboard() {
         </motion.div>
       </div>
 
-      {/* Highlighted projects */}
       <div>
         <div className="flex items-center justify-between mb-4">
           <h2 className="font-display text-lg font-semibold">Active projects</h2>
@@ -140,11 +137,18 @@ export default function Dashboard() {
             View all
           </a>
         </div>
-        <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {highlighted.map((p, i) => (
-            <ProjectCard key={p.id} project={p} index={i} />
-          ))}
-        </div>
+        {highlighted.length === 0 ? (
+          <div className="rounded-2xl border border-dashed border-white/10 py-16 text-center">
+            <p className="text-ink-soft font-medium">No projects yet</p>
+            <p className="text-sm text-ink-faint mt-1">Click "New Project" up top to create your first one.</p>
+          </div>
+        ) : (
+          <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-4">
+            {highlighted.map((p, i) => (
+              <ProjectCard key={p.id} project={p} index={i} />
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

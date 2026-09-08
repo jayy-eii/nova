@@ -1,128 +1,104 @@
-// Thin API client. Every UI component calls through here instead of importing
-// mock data directly, so wiring up a real backend later means editing this
-// file only — no component changes required.
-//
-// To connect a real backend:
-// 1. Set VITE_API_BASE_URL in a .env file (e.g. http://localhost:4000/api)
-// 2. Replace the mock branches below with the fetch calls (left commented
-//    beside each method as a starting point)
-// 3. Add an auth token getter (e.g. from localStorage / context) and attach
-//    it as a Bearer token in `headers`
+// Real API client. Every request goes to the Express + MongoDB backend
+// running at BASE_URL. No mock data lives here anymore.
 
-import {
-  stats,
-  productivityTrend,
-  taskDistribution,
-  projects,
-  tasksByProject,
-  team,
-  calendarEvents,
-  activity,
-  notifications,
-  currentUser,
-} from "../data/mockData";
+const BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:4000/api";
 
-const BASE_URL = import.meta.env.VITE_API_BASE_URL || "";
-const USE_MOCKS = !BASE_URL;
-
-async function request(path, options = {}) {
-  const res = await fetch(`${BASE_URL}${path}`, {
-    headers: { "Content-Type": "application/json", ...(options.headers || {}) },
-    ...options,
-  });
-  if (!res.ok) throw new Error(`API error ${res.status}: ${res.statusText}`);
-  return res.json();
+function getToken() {
+  return localStorage.getItem("nova_token");
 }
 
-const delay = (ms = 300) => new Promise((resolve) => setTimeout(resolve, ms));
+async function request(path, options = {}) {
+  const token = getToken();
+  const res = await fetch(`${BASE_URL}${path}`, {
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(options.headers || {}),
+    },
+    ...options,
+  });
+
+  const data = await res.json().catch(() => ({}));
+
+  if (!res.ok) {
+    throw new Error(data.error || `Request failed (${res.status})`);
+  }
+  return data;
+}
 
 export const api = {
   auth: {
     async login(email, password) {
-      if (USE_MOCKS) {
-        await delay();
-        return { token: "mock-token", user: currentUser };
-      }
       return request("/auth/login", { method: "POST", body: JSON.stringify({ email, password }) });
-      // return request("/auth/login", { method: "POST", body: JSON.stringify({ email, password }) });
     },
     async signup(payload) {
-      if (USE_MOCKS) {
-        await delay();
-        return { token: "mock-token", user: { ...currentUser, ...payload } };
-      }
       return request("/auth/signup", { method: "POST", body: JSON.stringify(payload) });
+    },
+    async me() {
+      return request("/auth/me");
     },
   },
 
   dashboard: {
     async getSummary() {
-      if (USE_MOCKS) {
-        await delay();
-        return { stats, productivityTrend, taskDistribution };
-      }
       return request("/dashboard/summary");
     },
   },
 
   projects: {
     async list() {
-      if (USE_MOCKS) {
-        await delay();
-        return projects;
-      }
       return request("/projects");
     },
     async get(id) {
-      if (USE_MOCKS) {
-        await delay();
-        return projects.find((p) => p.id === id) || null;
-      }
       return request(`/projects/${id}`);
     },
+    async create(payload) {
+      return request("/projects", { method: "POST", body: JSON.stringify(payload) });
+    },
+    async update(id, payload) {
+      return request(`/projects/${id}`, { method: "PATCH", body: JSON.stringify(payload) });
+    },
     async getTasks(projectId) {
-      if (USE_MOCKS) {
-        await delay();
-        return tasksByProject[projectId] || [];
-      }
       return request(`/projects/${projectId}/tasks`);
+    },
+    async createTask(projectId, payload) {
+      return request(`/projects/${projectId}/tasks`, { method: "POST", body: JSON.stringify(payload) });
+    },
+  },
+
+  tasks: {
+    async update(id, payload) {
+      return request(`/tasks/${id}`, { method: "PATCH", body: JSON.stringify(payload) });
     },
   },
 
   team: {
     async list() {
-      if (USE_MOCKS) {
-        await delay();
-        return team;
-      }
       return request("/team");
+    },
+    async invite(payload) {
+      return request("/team/invite", { method: "POST", body: JSON.stringify(payload) });
     },
   },
 
   calendar: {
     async listEvents() {
-      if (USE_MOCKS) {
-        await delay();
-        return calendarEvents;
-      }
       return request("/calendar/events");
+    },
+    async createEvent(payload) {
+      return request("/calendar/events", { method: "POST", body: JSON.stringify(payload) });
     },
   },
 
   activity: {
     async list() {
-      if (USE_MOCKS) {
-        await delay();
-        return activity;
-      }
       return request("/activity");
     },
     async notifications() {
-      if (USE_MOCKS) {
-        await delay();
-        return notifications;
-      }
       return request("/notifications");
+    },
+    async markNotificationsRead() {
+      return request("/notifications/mark-read", { method: "PATCH" });
     },
   },
 };

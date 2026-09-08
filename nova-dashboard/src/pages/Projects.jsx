@@ -1,14 +1,25 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
+import { useOutletContext } from "react-router-dom";
 import { Search, SlidersHorizontal, Plus } from "lucide-react";
 import ProjectCard from "../components/ProjectCard";
-import { projects } from "../data/mockData";
+import { api } from "../lib/api";
 
 const filters = ["All", "On Track", "At Risk", "Delayed", "Completed"];
 
 export default function Projects() {
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState("All");
+  const [projects, setProjects] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const { openNewProject } = useOutletContext();
+
+  useEffect(() => {
+    api.projects
+      .list()
+      .then(setProjects)
+      .finally(() => setLoading(false));
+  }, []);
 
   const filtered = useMemo(() => {
     return projects.filter((p) => {
@@ -16,7 +27,7 @@ export default function Projects() {
       const matchesQuery = p.name.toLowerCase().includes(query.toLowerCase());
       return matchesFilter && matchesQuery;
     });
-  }, [query, filter]);
+  }, [projects, query, filter]);
 
   return (
     <div className="space-y-6">
@@ -52,20 +63,27 @@ export default function Projects() {
           ))}
         </div>
 
-        <button className="hidden sm:flex items-center gap-1.5 ml-auto rounded-xl border border-white/[0.08] bg-white/[0.03] px-3 py-2.5 text-xs font-medium text-ink-soft hover:text-ink transition-colors">
-          <SlidersHorizontal size={14} />
-          Sort
-        </button>
-        <button className="flex items-center justify-center gap-1.5 rounded-xl bg-gradient-to-br from-iris-500 to-iris-700 px-3.5 py-2.5 text-xs font-medium text-white shadow-glow hover:brightness-110 transition-all active:scale-95">
+        <button
+          onClick={openNewProject}
+          className="flex items-center justify-center gap-1.5 sm:ml-auto rounded-xl bg-gradient-to-br from-iris-500 to-iris-700 px-3.5 py-2.5 text-xs font-medium text-white shadow-glow hover:brightness-110 transition-all active:scale-95"
+        >
           <Plus size={15} />
           New Project
         </button>
       </div>
 
-      {filtered.length === 0 ? (
+      {loading ? (
+        <div className="py-20 text-center text-sm text-ink-faint">Loading projects…</div>
+      ) : filtered.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-white/10 py-20 text-center">
-          <p className="text-ink-soft font-medium">No projects match that search</p>
-          <p className="text-sm text-ink-faint mt-1">Try a different name or clear your filters.</p>
+          <p className="text-ink-soft font-medium">
+            {projects.length === 0 ? "No projects yet" : "No projects match that search"}
+          </p>
+          <p className="text-sm text-ink-faint mt-1">
+            {projects.length === 0
+              ? 'Click "New Project" to create your first one.'
+              : "Try a different name or clear your filters."}
+          </p>
         </div>
       ) : (
         <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-4">

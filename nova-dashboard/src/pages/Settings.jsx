@@ -2,7 +2,7 @@ import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { User, Bell, Palette, Shield, Camera } from "lucide-react";
 import { Avatar } from "../components/ui";
-import { currentUser } from "../data/mockData";
+import { useAuth } from "../context/AuthContext";
 
 const tabs = [
   { key: "profile", label: "Profile", icon: User },
@@ -13,6 +13,7 @@ const tabs = [
 
 export default function Settings() {
   const [tab, setTab] = useState("profile");
+  const { user } = useAuth();
 
   return (
     <div className="grid lg:grid-cols-[220px_1fr] gap-4">
@@ -47,7 +48,7 @@ export default function Settings() {
             exit={{ opacity: 0, y: -6 }}
             transition={{ duration: 0.2 }}
           >
-            {tab === "profile" && <ProfileTab />}
+            {tab === "profile" && <ProfileTab user={user} />}
             {tab === "notifications" && <NotificationsTab />}
             {tab === "appearance" && <AppearanceTab />}
             {tab === "security" && <SecurityTab />}
@@ -79,26 +80,27 @@ function Field({ label, ...props }) {
   );
 }
 
-function ProfileTab() {
+function ProfileTab({ user }) {
+  if (!user) return null;
   return (
     <div>
       <SectionHeader title="Profile" subtitle="Update your photo and personal details." />
       <div className="flex items-center gap-4 mb-7">
         <div className="relative">
-          <Avatar initials={currentUser.initials} color={currentUser.avatarColor} size={72} />
+          <Avatar initials={user.initials} color={user.avatarColor} size={72} />
           <button className="absolute -bottom-1 -right-1 grid place-items-center h-7 w-7 rounded-full bg-iris-500 text-white border-2 border-base-300">
             <Camera size={13} />
           </button>
         </div>
         <div>
-          <p className="font-medium">{currentUser.name}</p>
-          <p className="text-xs text-ink-faint mt-0.5">{currentUser.role}</p>
+          <p className="font-medium">{user.name}</p>
+          <p className="text-xs text-ink-faint mt-0.5">{user.role}</p>
         </div>
       </div>
       <div className="grid sm:grid-cols-2 gap-4">
-        <Field label="Full name" defaultValue={currentUser.name} />
-        <Field label="Role" defaultValue={currentUser.role} />
-        <Field label="Email" defaultValue={currentUser.email} type="email" />
+        <Field label="Full name" defaultValue={user.name} />
+        <Field label="Role" defaultValue={user.role} />
+        <Field label="Email" defaultValue={user.email} type="email" />
         <Field label="Phone" placeholder="+91 98765 43210" />
       </div>
       <div className="mt-7 flex justify-end">

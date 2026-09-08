@@ -2,16 +2,23 @@ import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Search, Bell, Menu, Plus, ChevronDown, LogOut, User, Settings } from "lucide-react";
 import { Avatar } from "./ui";
-import { currentUser, notifications } from "../data/mockData";
+import { api } from "../lib/api";
+import { useAuth } from "../context/AuthContext";
 import { useNavigate } from "react-router-dom";
 
-export default function TopBar({ title, subtitle, onMenuClick }) {
+export default function TopBar({ title, subtitle, onMenuClick, onNewProject }) {
   const [notifOpen, setNotifOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [notifications, setNotifications] = useState([]);
   const notifRef = useRef(null);
   const profileRef = useRef(null);
   const navigate = useNavigate();
+  const { user, logout } = useAuth();
   const unreadCount = notifications.filter((n) => n.unread).length;
+
+  useEffect(() => {
+    api.activity.notifications().then(setNotifications).catch(() => {});
+  }, []);
 
   useEffect(() => {
     function handleClick(e) {
@@ -21,6 +28,22 @@ export default function TopBar({ title, subtitle, onMenuClick }) {
     document.addEventListener("mousedown", handleClick);
     return () => document.removeEventListener("mousedown", handleClick);
   }, []);
+
+  async function handleMarkAllRead() {
+    try {
+      await api.activity.markNotificationsRead();
+      setNotifications((prev) => prev.map((n) => ({ ...n, unread: false })));
+    } catch {
+      // silently ignore — not critical
+    }
+  }
+
+  function handleLogout() {
+    logout();
+    navigate("/");
+  }
+
+  if (!user) return null;
 
   return (
     <header className="sticky top-0 z-30 -mx-4 sm:-mx-6 lg:mx-0 px-4 sm:px-6 lg:px-0 pt-4 lg:pt-0">
@@ -45,7 +68,10 @@ export default function TopBar({ title, subtitle, onMenuClick }) {
             />
           </div>
 
-          <button className="hidden sm:flex items-center gap-1.5 rounded-xl bg-gradient-to-br from-iris-500 to-iris-700 px-3.5 py-2 text-sm font-medium text-white shadow-glow hover:brightness-110 transition-all active:scale-95">
+          <button
+            onClick={onNewProject}
+            className="hidden sm:flex items-center gap-1.5 rounded-xl bg-gradient-to-br from-iris-500 to-iris-700 px-3.5 py-2 text-sm font-medium text-white shadow-glow hover:brightness-110 transition-all active:scale-95"
+          >
             <Plus size={16} />
             New Project
           </button>
@@ -76,6 +102,11 @@ export default function TopBar({ title, subtitle, onMenuClick }) {
                     <span className="text-xs text-iris-400">{unreadCount} new</span>
                   </div>
                   <div className="max-h-80 overflow-y-auto">
+                    {notifications.length === 0 && (
+                      <p className="px-4 py-6 text-center text-xs text-ink-faint">
+                        You're all caught up.
+                      </p>
+                    )}
                     {notifications.map((n) => (
                       <div
                         key={n.id}
@@ -94,6 +125,7 @@ export default function TopBar({ title, subtitle, onMenuClick }) {
                   </div>
                   <button
                     onClick={() => {
+                      handleMarkAllRead();
                       setNotifOpen(false);
                       navigate("/activity");
                     }}
@@ -111,7 +143,7 @@ export default function TopBar({ title, subtitle, onMenuClick }) {
               onClick={() => setProfileOpen((v) => !v)}
               className="flex items-center gap-2 rounded-xl border border-white/[0.07] bg-white/[0.03] pl-1.5 pr-2 py-1.5 hover:bg-white/[0.06] transition-colors"
             >
-              <Avatar initials={currentUser.initials} color={currentUser.avatarColor} size={28} />
+              <Avatar initials={user.initials} color={user.avatarColor} size={28} />
               <ChevronDown size={14} className="text-ink-faint hidden sm:block" />
             </button>
             <AnimatePresence>
@@ -124,10 +156,10 @@ export default function TopBar({ title, subtitle, onMenuClick }) {
                   className="absolute right-0 mt-2 w-56 glass-strong rounded-2xl shadow-panel overflow-hidden p-1.5"
                 >
                   <div className="px-3 py-2.5 flex items-center gap-2.5 border-b border-line mb-1.5">
-                    <Avatar initials={currentUser.initials} color={currentUser.avatarColor} size={34} />
+                    <Avatar initials={user.initials} color={user.avatarColor} size={34} />
                     <div className="min-w-0">
-                      <p className="text-sm font-medium truncate">{currentUser.name}</p>
-                      <p className="text-xs text-ink-faint truncate">{currentUser.email}</p>
+                      <p className="text-sm font-medium truncate">{user.name}</p>
+                      <p className="text-xs text-ink-faint truncate">{user.email}</p>
                     </div>
                   </div>
                   <button
@@ -151,7 +183,7 @@ export default function TopBar({ title, subtitle, onMenuClick }) {
                   <button
                     onClick={() => {
                       setProfileOpen(false);
-                      navigate("/");
+                      handleLogout();
                     }}
                     className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-coral hover:bg-coral/10 transition-colors"
                   >

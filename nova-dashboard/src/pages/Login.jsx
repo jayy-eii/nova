@@ -1,23 +1,54 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate, Link } from "react-router-dom";
-import { Sparkles, Mail, Lock, User, ArrowRight, Eye, EyeOff, ArrowLeft, LayoutGrid, FolderKanban, Users, CalendarDays } from "lucide-react";
+import {
+  Sparkles,
+  Mail,
+  Lock,
+  User,
+  ArrowRight,
+  Eye,
+  EyeOff,
+  ArrowLeft,
+  LayoutGrid,
+  FolderKanban,
+  Users,
+  CalendarDays,
+  AlertCircle,
+} from "lucide-react";
 import BackgroundDecor from "../components/BackgroundDecor";
+import { useAuth } from "../context/AuthContext";
 
 export default function Login() {
   const [mode, setMode] = useState("login"); // "login" | "signup"
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [form, setForm] = useState({ name: "", email: "", password: "" });
+  const { login, signup } = useAuth();
   const navigate = useNavigate();
 
-  function handleSubmit(e) {
+  function updateField(key, value) {
+    setForm((f) => ({ ...f, [key]: value }));
+    if (error) setError("");
+  }
+
+  async function handleSubmit(e) {
     e.preventDefault();
+    setError("");
     setLoading(true);
-    // Placeholder for real auth call: await api.auth.login(email, password)
-    setTimeout(() => {
-      setLoading(false);
+    try {
+      if (mode === "login") {
+        await login(form.email, form.password);
+      } else {
+        await signup({ name: form.name, email: form.email, password: form.password });
+      }
       navigate("/dashboard");
-    }, 650);
+    } catch (err) {
+      setError(err.message || "Something went wrong. Please try again.");
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
@@ -95,7 +126,10 @@ export default function Login() {
             {["login", "signup"].map((m) => (
               <button
                 key={m}
-                onClick={() => setMode(m)}
+                onClick={() => {
+                  setMode(m);
+                  setError("");
+                }}
                 className="relative px-4 py-1.5 text-sm font-medium rounded-lg transition-colors"
               >
                 {mode === m && (
@@ -129,17 +163,41 @@ export default function Login() {
                   : "Set up NOVA for your team in under a minute."}
               </p>
 
+              {error && (
+                <div className="flex items-start gap-2 rounded-xl border border-coral/30 bg-coral/10 px-3.5 py-2.5 mb-4 text-sm text-coral">
+                  <AlertCircle size={16} className="shrink-0 mt-0.5" />
+                  <span>{error}</span>
+                </div>
+              )}
+
               <form onSubmit={handleSubmit} className="space-y-4">
                 {mode === "signup" && (
-                  <Field icon={User} type="text" placeholder="Full name" required />
+                  <Field
+                    icon={User}
+                    type="text"
+                    placeholder="Full name"
+                    required
+                    value={form.name}
+                    onChange={(e) => updateField("name", e.target.value)}
+                  />
                 )}
-                <Field icon={Mail} type="email" placeholder="Work email" required />
+                <Field
+                  icon={Mail}
+                  type="email"
+                  placeholder="Work email"
+                  required
+                  value={form.email}
+                  onChange={(e) => updateField("email", e.target.value)}
+                />
                 <div className="relative">
                   <Field
                     icon={Lock}
                     type={showPassword ? "text" : "password"}
                     placeholder="Password"
                     required
+                    minLength={6}
+                    value={form.password}
+                    onChange={(e) => updateField("password", e.target.value)}
                   />
                   <button
                     type="button"
@@ -149,18 +207,6 @@ export default function Login() {
                     {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                   </button>
                 </div>
-
-                {mode === "login" && (
-                  <div className="flex items-center justify-between text-xs pt-1">
-                    <label className="flex items-center gap-2 text-ink-faint cursor-pointer">
-                      <input type="checkbox" className="accent-iris-500 rounded" />
-                      Remember me
-                    </label>
-                    <a href="#" className="text-iris-400 hover:text-iris-400/80">
-                      Forgot password?
-                    </a>
-                  </div>
-                )}
 
                 <button
                   type="submit"
@@ -181,7 +227,10 @@ export default function Login() {
               <p className="text-xs text-ink-faint text-center mt-6">
                 {mode === "login" ? "New to NOVA?" : "Already have an account?"}{" "}
                 <button
-                  onClick={() => setMode(mode === "login" ? "signup" : "login")}
+                  onClick={() => {
+                    setMode(mode === "login" ? "signup" : "login");
+                    setError("");
+                  }}
                   className="text-iris-400 font-medium hover:text-iris-400/80"
                 >
                   {mode === "login" ? "Create an account" : "Log in"}
