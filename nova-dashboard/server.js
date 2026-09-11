@@ -18,18 +18,16 @@ const app = express();
 const PORT = process.env.PORT || 4000;
 const MONGODB_URI = process.env.MONGODB_URI || "mongodb://127.0.0.1:27017/nova-dashboard";
 
-const allowedOrigins = [
-  "http://localhost:5173",
-  "https://nova-jayy8.vercel.app"
-];
-
 app.use(cors({
   origin: function (origin, callback) {
     if (!origin) return callback(null, true);
-    
+
     const hostname = new URL(origin).hostname;
+
+    // Localhost aur saare *.vercel.app subdomains ko allow karega
     const isAllowed = 
-      allowedOrigins.includes(origin) || 
+      hostname === "localhost" ||
+      hostname.endsWith(".vercel.app") ||
       hostname.endsWith("vercel.app");
 
     if (isAllowed) {
