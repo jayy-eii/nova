@@ -18,14 +18,27 @@ const app = express();
 const PORT = process.env.PORT || 4000;
 const MONGODB_URI = process.env.MONGODB_URI || "mongodb://127.0.0.1:27017/nova-dashboard";
 
+const allowedOrigins = [
+  "http://localhost:5173",
+  "https://nova-jayy8.vercel.app"
+];
+
 app.use(cors({
   origin: function (origin, callback) {
     if (!origin) return callback(null, true);
-    const allowed =
-      origin === "http://localhost:5173" ||
-      /\.vercel\.app$/.test(new URL(origin).hostname);
-    callback(null, allowed);
+    
+    const hostname = new URL(origin).hostname;
+    const isAllowed = 
+      allowedOrigins.includes(origin) || 
+      hostname.endsWith("vercel.app");
+
+    if (isAllowed) {
+      callback(null, true);
+    } else {
+      callback(new Error("Not allowed by CORS"));
+    }
   },
+  credentials: true
 }));
 app.use(express.json({ limit: "10mb" }));
 
