@@ -12,11 +12,12 @@ const userSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-// Hash the password automatically whenever it's set/changed
-userSchema.pre("save", async function (next) {
-  if (!this.isModified("password")) return next();
+// Hash the password automatically whenever it's set/changed.
+// NOTE: async pre-hooks in mongoose v9 don't pass a `next` callback —
+// just return (or let the async function resolve) instead of calling next().
+userSchema.pre("save", async function () {
+  if (!this.isModified("password")) return;
   this.password = await bcrypt.hash(this.password, 10);
-  next();
 });
 
 // Compare a plain-text password against the stored hash
