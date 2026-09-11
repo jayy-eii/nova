@@ -129,7 +129,6 @@ app.get("/api/health", (req, res) => {
 });
 
 // ---------- Auth ----------
-
 app.post("/api/auth/signup", async (req, res) => {
   try {
     const { name, email, password, role } = req.body;
@@ -153,6 +152,7 @@ app.post("/api/auth/signup", async (req, res) => {
       user: { ...user.toJSON(), initials: user.getInitials() },
     });
   } catch (err) {
+    console.error("❌ Signup error:", err); // <-- Yeh line yahan add karein
     res.status(500).json({ error: "Server error", detail: err.message });
   }
 });
